@@ -1,0 +1,7 @@
+type: S3
+config:
+  bucket: prometheus-tsdb
+  endpoint: minio:9002 # Use the API endpoint port
+  access_key: minioadmin
+  secret_key: minioadmin
+  insecure: true

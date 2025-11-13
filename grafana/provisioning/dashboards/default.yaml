@@ -1,0 +1,13 @@
+# grafana/provisioning/dashboards/default.yaml
+apiVersion: 1
+providers:
+  - name: 'lower-env-dashboards'
+    orgId: 1
+    folder: ''
+    # Type must be 'file' to load JSON dashboards
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      # This is the directory inside the container where the JSON files must reside
+      path: /etc/grafana/provisioning/dashboards

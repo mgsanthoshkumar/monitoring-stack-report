@@ -1,0 +1,105 @@
+version: '3.7'
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alertmanager.yml:/etc/prometheus/alertmanager.yml
+      - ./prometheus/alerting_rules.yml:/etc/prometheus/rules.yml 
+      - ./prometheus/thanos-objstore.yml:/etc/prometheus/thanos-objstore.yml 
+    ports:
+      - "9090:9090"
+      - "10901:10901" 
+    command:
+      - '/bin/prometheus'
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-lifecycle'
+      - '--web.listen-address=0.0.0.0:9090'
+      - '--storage.tsdb.retention.time=1h'
+      - '--enable-feature=exemplar-storage'
+      - '--web.external-url=http://prometheus:9090'
+      - '--ext.alertmanager.url=http://alertmanager:9093'
+      - '--ext.storage.type=s3'
+      - '--ext.config.file=/etc/prometheus/thanos-objstore.yml'
+    depends_on:
+      - node-exporter
+      - blackbox-exporter
+      - alertmanager
+      - minio
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana-data:/var/lib/grafana # <<< NEW: Named volume for persistent data
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox-exporter
+    volumes:
+      - ./blackbox/config.yml:/etc/blackbox_exporter/config.yml
+    ports:
+      - "9115:9115"
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/config.yml:/etc/alertmanager/config.yml
+    ports:
+      - "9093:9093"
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9011:9001" 
+      - "9002:9002"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_BROWSER: "on"
+    command: server /data --console-address :9002
+    volumes:
+      - './minio_data:/data'
+    
+  thanos-query:
+    image: quay.io/thanos/thanos:v0.34.1
+    container_name: thanos-query
+    ports:
+      - "9091:9090"
+    command:
+      - query
+      - --http-address=0.0.0.0:9090
+      - --query.replica-label=replica
+      - --store=prometheus:10901
+    depends_on:
+      - prometheus
+      
+volumes:
+  grafana-data: # <<< DEFINITION OF THE NAMED VOLUME

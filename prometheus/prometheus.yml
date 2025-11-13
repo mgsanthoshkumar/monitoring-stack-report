@@ -1,0 +1,41 @@
+# prometheus/prometheus.yml
+global:
+  scrape_interval: 15s
+
+# 1. Alert Rules Configuration
+rule_files:
+  - "rules.yml" # Loaded from the mount via Docker Compose
+
+# 2. Alertmanager Configuration (Simplified - only targets needed here)
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: ['alertmanager:9093']
+
+# 3. Scrape Jobs
+scrape_configs:
+  # Job A: Prometheus Scraper (Self-Monitoring)
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Job B: Node Exporter Scraper (Internal Bridge Network)
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Job C: Blackbox Exporter Scraper (Application Health Checks)
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://grafana:3000
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
